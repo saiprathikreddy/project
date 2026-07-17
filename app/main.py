@@ -27,9 +27,9 @@ def health() -> dict:
 
 
 # Routers registered in build order — uncomment as each step is completed:
-# from app.routers import ingest, browse, selection, generate, retrieve
-# app.include_router(ingest.router,    prefix="/ingest",      tags=["ingest"])
-# app.include_router(browse.router,    prefix="",             tags=["browse"])
+from app.routers import ingest
+app.include_router(ingest.router,    prefix="/ingest",      tags=["ingest"])
+# from app.routers import browse, selection, generate, retrieve
 # app.include_router(selection.router, prefix="/selections",  tags=["selection"])
 # app.include_router(generate.router,  prefix="/generations", tags=["generate"])
 # app.include_router(retrieve.router,  prefix="/generations", tags=["retrieve"])
