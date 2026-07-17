@@ -1,0 +1,41 @@
+# ── Web framework ──────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# ── Validation ─────────────────────────────────────────────────────────────────
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# ── Database — SQLite ──────────────────────────────────────────────────────────
+sqlalchemy==2.0.30
+alembic==1.13.1
+
+# ── PDF parsing ────────────────────────────────────────────────────────────────
+# Using PyMuPDF (fitz) over pdfplumber for three reasons:
+#   1. Speed: ~10× faster on large manuals — important when re-ingesting on
+#      every version bump during development.
+#   2. Heading detection: exposes span-level flags (bold, italic) and font name
+#      directly via page.get_text("dict"), making font-based H1/H2 detection
+#      precise without needing character-level grouping hacks.
+#   3. Table extraction: fitz 1.23+ ships PyMuPDF-story / find_tables() with
+#      better cell-boundary detection than pdfplumber on bordered tables.
+#   Trade-off: AGPL license applies to the library itself (not the output data),
+#   acceptable for an internal tool / assignment; pdfplumber (MIT) is the right
+#   swap if the project is ever open-sourced.
+pymupdf==1.24.3
+
+# ── Database — MongoDB ─────────────────────────────────────────────────────────
+motor==3.4.0          # async Motor driver
+pymongo==4.7.2        # sync driver (used in tests / scripts)
+
+# ── LLM ───────────────────────────────────────────────────────────────────────
+google-generativeai==0.5.4
+
+# ── Utilities ──────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+python-multipart==0.0.9   # for UploadFile in FastAPI
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest==8.2.0
+pytest-asyncio==0.23.6
+httpx==0.27.0             # AsyncClient for FastAPI TestClient
