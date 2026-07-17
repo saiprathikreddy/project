@@ -58,10 +58,10 @@ ingest_v1_res=$(curl -s -X POST "$API_BASE/ingest" \
   -F "description=Initial released draft of product specification" \
   -F "file=@$v1_path")
 
-echo "$ingest_v1_res" | jq . 2>/dev/null || echo "$ingest_v1_res"
+echo "$ingest_v1_res" | python -m json.tool 2>/dev/null || echo "$ingest_v1_res"
 
-version_number=$(echo "$ingest_v1_res" | jq -r '.version_number' 2>/dev/null)
-if [ "$version_number" == "null" ] || [ -z "$version_number" ]; then
+version_number=$(python -c "import sys, json; print(json.load(sys.stdin).get('version_number', ''))" <<< "$ingest_v1_res")
+if [ -z "$version_number" ] || [ "$version_number" == "None" ]; then
     write_error "Ingestion failed."
     exit 1
 fi
@@ -74,10 +74,10 @@ sections_res=$(curl -s -G "$API_BASE/sections" \
   --data-urlencode "version_number=1" \
   --data-urlencode "level=1")
 
-echo "$sections_res" | jq '.[] | {id: .id, heading: .heading}' 2>/dev/null || echo "$sections_res"
+python -c "import sys, json; data=json.load(sys.stdin); [print(f\"ID: {n['id']} | Heading: {n['heading']} | Level: {n['level']}\") for n in data]" <<< "$sections_res"
 
 # Extract the first two node IDs
-node_ids=($(echo "$sections_res" | jq -r '.[].id' 2>/dev/null))
+node_ids=($(python -c "import sys, json; data=json.load(sys.stdin); print(' '.join(str(n['id']) for n in data))" <<< "$sections_res"))
 if [ ${#node_ids[@]} -eq 0 ]; then
     write_error "No sections found. Ingestion failed to parse hierarchy."
     exit 1
@@ -92,8 +92,8 @@ selection_res=$(curl -s -X POST "$API_BASE/selections" \
   -H "Content-Type: application/json" \
   -d "{\"name\": \"Key Safety & Operations Basket\", \"device_model\": \"CT-200\", \"version_number\": 1, \"node_ids\": $selected_nodes, \"description\": \"Test suite covering safety protocols\"}")
 
-echo "$selection_res" | jq . 2>/dev/null || echo "$selection_res"
-selection_id=$(echo "$selection_res" | jq -r '.id' 2>/dev/null)
+echo "$selection_res" | python -m json.tool 2>/dev/null || echo "$selection_res"
+selection_id=$(python -c "import sys, json; print(json.load(sys.stdin).get('id', ''))" <<< "$selection_res")
 write_success "Created Selection ID: $selection_id"
 
 # 4. Generate QA Test Cases
@@ -102,9 +102,9 @@ gen_res=$(curl -s -X POST "$API_BASE/generations" \
   -H "Content-Type: application/json" \
   -d "{\"selection_id\": $selection_id}")
 
-echo "$gen_res" | jq . 2>/dev/null || echo "$gen_res"
-generation_id=$(echo "$gen_res" | jq -r '.id' 2>/dev/null)
-is_cached=$(echo "$gen_res" | jq -r '.is_cached' 2>/dev/null)
+echo "$gen_res" | python -m json.tool 2>/dev/null || echo "$gen_res"
+generation_id=$(python -c "import sys, json; print(json.load(sys.stdin).get('id', ''))" <<< "$gen_res")
+is_cached=$(python -c "import sys, json; print(json.load(sys.stdin).get('is_cached', ''))" <<< "$gen_res")
 write_success "Generated test cases successfully (Cached status: $is_cached)"
 
 # 5. Ingest V2 PDF
@@ -115,16 +115,16 @@ ingest_v2_res=$(curl -s -X POST "$API_BASE/ingest" \
   -F "description=Second revision manual with updated safety thresholds" \
   -F "file=@$v2_path")
 
-echo "$ingest_v2_res" | jq . 2>/dev/null || echo "$ingest_v2_res"
+echo "$ingest_v2_res" | python -m json.tool 2>/dev/null || echo "$ingest_v2_res"
 write_success "Ingested version 2 successfully."
 
 # 6. Retrieve Generations with Staleness check
 write_header "Step 6: Retrieving test cases and checking for Staleness"
 retrieve_res=$(curl -s -X GET "$API_BASE/generations/$generation_id")
 
-echo "$retrieve_res" | jq . 2>/dev/null || echo "$retrieve_res"
+echo "$retrieve_res" | python -m json.tool 2>/dev/null || echo "$retrieve_res"
 
-is_stale=$(echo "$retrieve_res" | jq -r '.staleness.is_stale' 2>/dev/null)
+is_stale=$(python -c "import sys, json; data=json.load(sys.stdin); print(str(data.get('staleness', {}).get('is_stale', '')).lower())" <<< "$retrieve_res")
 echo -ne "${GREEN}Retrieved Generation ID: $generation_id${NC}\n"
 echo -ne "${CYAN}Staleness Status: ${NC}"
 if [ "$is_stale" == "true" ]; then
