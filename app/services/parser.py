@@ -84,17 +84,18 @@ class PDFParser:
         self.body_font_size = 10.0
         self.heading_thresholds: List[float] = []
 
-    def parse(self) -> ParsedNode:
+    def parse(self, analyze_fonts: bool = True) -> ParsedNode:
         """
         Reads the PDF and returns the root ParsedNode.
         """
         doc = fitz.open(self.pdf_path)
         
         # 1. Analyze font size distribution across the document to set thresholds
-        self._analyze_fonts(doc)
+        if analyze_fonts:
+            self._analyze_fonts(doc)
 
         # 2. Build the hierarchical tree
-        root = ParsedNode(heading="Root", level=0, heading_path="Root")
+        root = ParsedNode(heading="Root", level=0, heading_path="")
         stack: List[ParsedNode] = [root]
 
         # Duplicate heading counter to handle identical headings at same level
@@ -141,6 +142,11 @@ class PDFParser:
                     for tbl_idx, tbl in enumerate(tables):
                         if tbl_idx not in table_inserted_indices and self._is_bbox_intersecting(block_bbox, tbl.bbox):
                             table_node = self._extract_table_node(tbl, page_idx, stack[-1])
+                            # Append table markdown to the current heading's body_text
+                            if stack[-1].body_text:
+                                stack[-1].body_text += "\n\n" + table_node.body_text
+                            else:
+                                stack[-1].body_text = table_node.body_text
                             stack[-1].add_child(table_node)
                             table_node.calculate_hash()
                             table_inserted_indices.add(tbl_idx)
@@ -217,6 +223,11 @@ class PDFParser:
             for tbl_idx, tbl in enumerate(tables):
                 if tbl_idx not in table_inserted_indices:
                     table_node = self._extract_table_node(tbl, page_idx, stack[-1])
+                    # Append table markdown to the current heading's body_text
+                    if stack[-1].body_text:
+                        stack[-1].body_text += "\n\n" + table_node.body_text
+                    else:
+                        stack[-1].body_text = table_node.body_text
                     stack[-1].add_child(table_node)
                     table_node.calculate_hash()
                     table_inserted_indices.add(tbl_idx)
@@ -232,6 +243,10 @@ class PDFParser:
         Sets thresholds for heading levels H1, H2, H3.
         """
         font_sizes: List[float] = []
+        # Count font size occurrences weighted by character length
+        from collections import defaultdict
+        size_char_counts = defaultdict(int)
+
         for page in doc:
             for block in page.get_text("dict").get("blocks", []):
                 if block.get("type") != 0:
@@ -239,8 +254,12 @@ class PDFParser:
                 for line in block.get("lines", []):
                     for span in line.get("spans", []):
                         sz = span.get("size", 10.0)
-                        if sz > 0:
-                            font_sizes.append(sz)
+                        txt = span.get("text", "")
+                        if sz > 0 and txt.strip():
+                            rounded_sz = round(float(sz), 1)
+                            # Weight by number of characters in the span
+                            size_char_counts[rounded_sz] += len(txt)
+                            font_sizes.extend([rounded_sz] * len(txt))
 
         if not font_sizes:
             # Fallbacks
@@ -248,10 +267,8 @@ class PDFParser:
             self.heading_thresholds = [18.0, 14.0, 12.0]
             return
 
-        # Find the most common font size (body text size)
-        from collections import Counter
-        size_counts = Counter([round(sz, 1) for sz in font_sizes])
-        self.body_font_size = size_counts.most_common(1)[0][0]
+        # Body font size is the one with the most characters in the document
+        self.body_font_size = max(size_char_counts, key=size_char_counts.get)
 
         # Filter out sizes smaller than body font size
         heading_sizes = sorted([sz for sz in font_sizes if sz > self.body_font_size + 0.5])
@@ -262,10 +279,6 @@ class PDFParser:
             return
 
         # Use percentiles to find thresholds
-        # H1: top 5%
-        # H2: top 15%
-        # H3: top 30%
-        # H4/Caption etc can fall into lower
         n = len(heading_sizes)
         h1_val = heading_sizes[int(n * 0.95)]
         h2_val = heading_sizes[int(n * 0.85)]
