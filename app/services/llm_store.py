@@ -6,6 +6,7 @@ Uses the async Motor client.
 """
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -13,6 +14,9 @@ from bson import ObjectId
 
 from app.db.mongo import get_mongo_db
 from app.schemas.generation import TestCase
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMStoreService:
