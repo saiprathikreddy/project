@@ -61,6 +61,11 @@ class Selection(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    document_version: Mapped["DocumentVersion"] = relationship(  # type: ignore[name-defined]
+        "DocumentVersion",
+        uselist=False,
+    )
+
     selection_nodes: Mapped[list["SelectionNode"]] = relationship(
         "SelectionNode",
         back_populates="selection",
