@@ -1,0 +1,77 @@
+{
+    "6a5a67d369e2bc970d55c8b4": {
+        "selection_id": 1,
+        "node_hashes_snapshot": "0699227f7027349dc480d07bfda907f66dac2df5ed5fcc3647cc68215a839072|5d51298493a6d6371dd56c6e8cbaf30b8aac168eb84198f5b713ea50b1bd5eff",
+        "test_cases": [
+            {
+                "id": "TC-001",
+                "title": "Verify blood pressure measurement boundary limits",
+                "description": "Verifies that the CT-200 blood pressure monitor displays an out-of-range error if pressure exceeds 300 mmHg.",
+                "preconditions": [
+                    "Device is calibrated and powered on.",
+                    "Simulated cuff pressure generator connected."
+                ],
+                "steps": [
+                    "Turn on the device.",
+                    "Simulate cuff pressure rising to 310 mmHg.",
+                    "Observe the display error code."
+                ],
+                "expected_result": "Device shows Error Code 'E-2' on display and halts pump motor immediately."
+            },
+            {
+                "id": "TC-002",
+                "title": "Verify low battery safety warning trigger",
+                "description": "Ensures a low battery indicator displays when battery voltage drops below 2.2V.",
+                "preconditions": [
+                    "DC voltage simulator source connected to battery terminals.",
+                    "Voltage set to nominal 3.0V."
+                ],
+                "steps": [
+                    "Power on the CT-200.",
+                    "Gradually decrease simulator voltage to 2.1V.",
+                    "Observe battery icon indicator status on screen."
+                ],
+                "expected_result": "Battery indicator icon flashes on LCD screen, and warning beep sounds twice."
+            },
+            {
+                "id": "TC-003",
+                "title": "Verify measurement abort button interrupt",
+                "description": "Ensures the user can cancel measurement at any time during cuff inflation.",
+                "preconditions": [
+                    "Cuff wrapped around patient simulator.",
+                    "Measurement started."
+                ],
+                "steps": [
+                    "Press start button to begin inflation.",
+                    "While cuff is inflating, press the Power/Stop button.",
+                    "Verify cuff deflation and motor status."
+                ],
+                "expected_result": "Inflation motor stops instantly, cuff releases pressure completely in under 2 seconds, screen shows 'OP-ERR'."
+            }
+        ],
+        "generated_at": "2026-07-17T17:35:15.113316+00:00",
+        "_id": "6a5a67d369e2bc970d55c8b4"
+    },
+    "6a5b26739505940bd48f2662": {
+        "selection_id": 2,
+        "node_hashes_snapshot": "hash_a|hash_b_old",
+        "test_cases": [
+            {
+                "id": "TC-FALLBACK",
+                "title": "Service Fallback - QA Generator Offline",
+                "description": "Automated fallback case generated due to LLM interface failure. Details: Gemini call failed: 404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.",
+                "preconditions": [
+                    "Gemini generation service experienced an error."
+                ],
+                "steps": [
+                    "Verify your Internet connection.",
+                    "Check that the GEMINI_API_KEY environment variable is configured and active.",
+                    "Verify Gemini rate limits have not been exceeded."
+                ],
+                "expected_result": "Gemini service becomes available and successfully returns structured JSON test cases."
+            }
+        ],
+        "generated_at": "2026-07-18T07:08:35.557496+00:00",
+        "_id": "6a5b26739505940bd48f2662"
+    }
+}

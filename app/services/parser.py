@@ -75,7 +75,8 @@ class ParsedNode:
 class PDFParser:
     """
     Parses a medical device manual PDF into a hierarchical tree.
-    Uses font sizes and bold attributes to identify heading levels.
+    Uses font sizes and bold attributes, supplemented by section numbers,
+    to identify heading levels.
     """
 
     def __init__(self, pdf_path: Path):
@@ -103,8 +104,22 @@ class PDFParser:
         path_counts: Dict[str, int] = {}
 
         for page_idx, page in enumerate(doc):
-            # Extract tables first to map their bounding boxes
-            tables = page.find_tables()
+            # Extract tables and filter out nested sub-tables
+            all_tables = page.find_tables().tables
+            tables = []
+            for t in all_tables:
+                is_inside_another = False
+                for other in all_tables:
+                    if t != other:
+                        if (t.bbox[0] >= other.bbox[0] - 2 and 
+                            t.bbox[2] <= other.bbox[2] + 2 and 
+                            t.bbox[1] >= other.bbox[1] - 2 and 
+                            t.bbox[3] <= other.bbox[3] + 2):
+                            is_inside_another = True
+                            break
+                if not is_inside_another:
+                    tables.append(t)
+
             table_bboxes = [t.bbox for t in tables]
 
             # Process normal text blocks
@@ -300,28 +315,40 @@ class PDFParser:
     def _classify_heading(self, text: str, font_size: float, is_bold: bool) -> Optional[int]:
         """
         Classifies a line of text as heading (1-4) or None (body).
-        Uses simple heuristic rules including common manual patterns (e.g. numbered headings like "1.1").
+        Uses a hybrid strategy combining section numbers and font sizes.
         """
         # Headings are generally not extremely long (e.g., less than 150 chars)
         if len(text) > 150:
             return None
 
-        # Check font size against thresholds
-        h1, h2, h3 = self.heading_thresholds
-        
-        # Explicit patterns (e.g., "1. Safety Information", "2.1 Specifications")
-        heading_num_pattern = re.match(r'^(\d+\.\d*)\s+[A-Z]', text)
-        is_numbered = bool(heading_num_pattern)
+        # Check explicit numbering patterns first (highly reliable)
+        # Match level 4: e.g. "2.1.1.1"
+        if re.match(r'^\d+\.\d+\.\d+\.\d+\s+', text):
+            return 4
+        # Match level 3: e.g. "2.1.1"
+        if re.match(r'^\d+\.\d+\.\d+\s+', text):
+            return 3
+        # Match level 2: e.g. "2.1"
+        if re.match(r'^\d+\.\d+\s+', text):
+            return 2
+        # Match level 1: e.g. "2." or "2 "
+        if re.match(r'^\d+(\.|\s)\s*', text):
+            if font_size >= 14.0 or is_bold:
+                return 1
 
+        # Skip document title on page 1
+        if font_size >= 20.0 and not re.match(r'^\d', text):
+            return None
+
+        # Fallback for non-numbered headings (e.g., from unit tests)
+        h1, h2, h3 = self.heading_thresholds
         if font_size >= h1:
             return 1
         elif font_size >= h2:
             return 2
         elif font_size >= h3:
             return 3
-        elif font_size >= self.body_font_size + 1.0 and (is_bold or is_numbered):
-            return 4
-        elif is_bold and is_numbered:
+        elif font_size >= self.body_font_size + 1.0 and is_bold:
             return 4
 
         return None
@@ -366,7 +393,6 @@ class PDFParser:
 
         table_md = "\n".join(md_lines)
         
-        # Table heading/caption detection could be added, but a generic name works well
         table_node = ParsedNode(
             heading=f"Table {page_idx + 1}-{parent_node.order_index + 1}",
             level=parent_node.level + 1,
